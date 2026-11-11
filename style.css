@@ -1072,3 +1072,14 @@ select,
     }
 
 }
+
+
+/* Vignette Demon Slayer cliquable — effet au survol */
+.review-feature a img {
+    cursor: pointer;
+    transition: transform 0.3s;
+}
+
+.review-feature a img:hover {
+    transform: scale(1.05);
+}
