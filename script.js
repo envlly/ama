@@ -566,7 +566,7 @@ async function jikanTrailer(titre) {
 // contient le plus de mots du titre cherché.
 async function anilistTrailers(titres) {
 
-    const alias = titres.map((t, i) => `a${i}: Media(search:"${t.replace(/"/g, '\\"')}",type:ANIME){title{romaji english} trailer{id site}}`);
+    const alias = titres.map((t, i) => `a${i}: Page(perPage:5){media(search:"${t.replace(/"/g, '\\"')}",type:ANIME){title{romaji english} trailer{id site}}}`);
     const reponse = await fetchAvecDelai('https://graphql.anilist.co', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -577,18 +577,22 @@ async function anilistTrailers(titres) {
     const resultats = {};
 
     titres.forEach((titre, i) => {
-        const liste = (donnees.data && donnees.data[`a${i}`]) ? [donnees.data[`a${i}`]] : [];
+        const liste = (donnees.data && donnees.data[`a${i}`] && donnees.data[`a${i}`].media) || [];
         const mots = titre.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
         let meilleurId = null;
         let meilleurScore = 0;
+        let meilleurTitre = '';
 
         for (const media of liste) {
             if (!media || !media.trailer || media.trailer.site !== 'youtube') continue;
             const titreComplet = (media.title.romaji + ' ' + (media.title.english || '')).toLowerCase();
             const score = mots.filter(mot => titreComplet.includes(mot)).length;
-            if (score > meilleurScore) {
+            // En cas d'égalité, on préfère le titre le plus court (la série
+            // principale plutôt que ses suites/films)
+            if (score > meilleurScore || (score === meilleurScore && meilleurId !== null && titreComplet.length < (meilleurTitre || '').length)) {
                 meilleurScore = score;
                 meilleurId = media.trailer.id;
+                meilleurTitre = titreComplet;
             }
         }
 
@@ -653,7 +657,11 @@ async function lierTrailerJikan() {
 }
 
 // On relance la liaison à chaque fois que la grille est re-render
-// (recherche, filtre de genre, changement de page...)
+// (recherche, filtre de genre, changement de page...), ET une première
+// fois tout de suite car le premier rendu a lieu avant cette ligne.
+
+lierTrailerJikan();
+
 const observateurVignettes = new MutationObserver(() => lierTrailerJikan());
 
 observateurVignettes.observe(grid, { childList: true });
