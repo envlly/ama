@@ -47,22 +47,25 @@ Un bug est arrivé en cours de projet : le HTML cherchait des fichiers qui s'app
 
 La correction : renommer les fichiers pour qu'ils correspondent exactement à ce que demande le HTML (`accueil.html` → `index.html` aussi, car GitHub Pages cherche toujours un fichier nommé `index.html`).
 
-### 4. L'API REST de Jikan (pour trouver la bande-annonce)
+### 4. L'API REST de Jikan (pour trouver les bandes-annonces)
 
-Pour savoir quelle vidéo mettre derrière la vignette, on a utilisé **l'API REST de Jikan** (https://jikan.moe), qui est l'API gratuite de MyAnimeList. Une API REST, c'est un site qui renvoie des données en JSON quand on lui demande une URL — ici, les infos sur les animés.
+Pour rendre **toutes** les affiches cliquables, chaque carte de la grille (accueil, films, séries) est maintenant un lien vers la bande-annonce de l'animé. Le lien est écrit en JavaScript dans `cardTemplate()` (fonction qui fabrique les cartes) et l'API **Jikan** (https://jikan.moe), l'API gratuite de MyAnimeList, remplace automatiquement le lien de secours par la vraie bande-annonce.
+
+Une API REST, c'est un site qui renvoie des données en JSON quand on lui demande une URL — ici, les infos sur les animés.
 
 Dans `script.js`, une fonction interroge l'API avec `fetch()` et récupère **automatiquement** l'identifiant YouTube du trailer :
 
 ```javascript
-const reponse = await fetch('https://api.jikan.moe/v4/anime/38000');
+const reponse = await fetch(`https://api.jikan.moe/v4/anime?q=${titre}&limit=1`);
 const anime = await reponse.json();
 const idTrailer = anime.trailer && anime.trailer.youtube_id;
 lien.href = `https://www.youtube.com/embed/${idTrailer}?autoplay=1`;
 ```
 
-- `38000` c'est l'identifiant de Demon Slayer dans la base MyAnimeList
 - Pas besoin de clé d'API ni de serveur : le navigateur fait la requête directement
-- Si l'API ne répond pas, le site garde le lien de secours écrit dans le HTML, donc la vignette marche quand même
+- Un cache (`Map`) évite de redemander deux fois le même animé, et une petite pause entre les requêtes respecte le quota de l'API
+- Un `MutationObserver` relance la liaison chaque fois que la grille est régénérée (recherche, filtre, changement de page)
+- Si l'API ne répond pas, le site garde un lien de secours vers la recherche YouTube, donc la vignette marche quand même
 
 ### 5. Mise en ligne avec GitHub Pages
 

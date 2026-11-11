@@ -130,20 +130,27 @@ function cardTemplate(anime) {
 
         <article class="anime-card">
 
-            <div class="poster-wrap">
+            <a class="poster-link"
+               target="_blank"
+               data-anime-title="${anime.title}"
+               href="https://www.youtube.com/results?search_query=${encodeURIComponent(anime.title + " bande annonce officielle")}">
 
-                <img
-                    src="${anime.image}"
-                    alt="Affiche de ${anime.title}"
-                    loading="lazy"
-                    onerror="this.src='https://placehold.co/400x600/F0E1E8/A8436D?text=AMA'"
-                >
+                <div class="poster-wrap">
 
-                <span class="poster-type">
-                    ${anime.type}
-                </span>
+                    <img
+                        src="${anime.image}"
+                        alt="Affiche de ${anime.title}"
+                        loading="lazy"
+                        onerror="this.src='https://placehold.co/400x600/F0E1E8/A8436D?text=AMA'"
+                    >
 
-            </div>
+                    <span class="poster-type">
+                        ${anime.type}
+                    </span>
+
+                </div>
+
+            </a>
 
 
             <div class="anime-info">
@@ -523,3 +530,59 @@ async function chargerBandeAnnonceDemonSlayer() {
 }
 
 chargerBandeAnnonceDemonSlayer();
+
+
+// TOUTES LES VIGNETTES CLIQUABLES GRÂCE À L'API JIKAN
+// Le lien de secours (recherche YouTube) est remplacé par la vraie
+// bande-annonce dès que l'API Jikan répond. On met un cache pour
+// ne jamais demander deux fois le même animé.
+
+const cacheTrailers = new Map();
+
+async function lierTrailerJikan() {
+
+    const liens = document.querySelectorAll("a.poster-link[data-anime-title]");
+
+    for (const lien of liens) {
+
+        const titre = lien.dataset.animeTitle;
+
+        if (cacheTrailers.has(titre)) {
+            if (cacheTrailers.get(titre)) {
+                lien.href = `https://www.youtube.com/embed/${cacheTrailers.get(titre)}?autoplay=1`;
+            }
+            continue;
+        }
+
+        try {
+
+            const reponse = await fetch(
+                `https://api.jikan.moe/v4/anime?q=${encodeURIComponent(titre)}&limit=1`
+            );
+            const donnees = await reponse.json();
+            const anime = donnees.data && donnees.data[0];
+            const idTrailer = anime && anime.trailer && anime.trailer.youtube_id;
+
+            if (idTrailer) {
+                cacheTrailers.set(titre, idTrailer);
+                lien.href = `https://www.youtube.com/embed/${idTrailer}?autoplay=1`;
+            } else {
+                cacheTrailers.set(titre, null);
+            }
+
+        } catch (erreur) {
+            // API indisponible : le lien de secours (recherche YouTube) reste actif
+        }
+
+        await new Promise(resolve => setTimeout(resolve, 400));
+    }
+}
+
+// On relance la liaison à chaque fois que la grille est re-render
+// (recherche, filtre de genre, changement de page...)
+const observateurVignettes = new MutationObserver(() => lierTrailerJikan());
+
+observateurVignettes.observe(grid, { childList: true });
+
+if (filmsGrid) observateurVignettes.observe(filmsGrid, { childList: true });
+if (seriesGrid) observateurVignettes.observe(seriesGrid, { childList: true });

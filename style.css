@@ -1083,3 +1083,22 @@ select,
 .review-feature a img:hover {
     transform: scale(1.05);
 }
+
+
+/* Vignettes des cartes cliquables (grille accueil, films, séries) */
+.anime-card a.poster-link {
+    display: block;
+    text-decoration: none;
+    color: inherit;
+}
+
+.anime-card a.poster-link img,
+.review-feature a img {
+    cursor: pointer;
+    transition: transform 0.3s;
+}
+
+.anime-card a.poster-link:hover img,
+.review-feature a img:hover {
+    transform: scale(1.05);
+}
