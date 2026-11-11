@@ -497,3 +497,29 @@ document.getElementById("backTop").addEventListener("click", () => {
 // LANCER LE SITE
 
 render();
+
+
+// BANDE-ANNONCE DEMON SLAYER VIA L'API JIKAN
+// L'API Jikan (https://jikan.moe) est l'API REST gratuite de MyAnimeList.
+// On lui demande les infos de Demon Slayer (id 38000) et on récupère
+// l'identifiant YouTube de sa bande-annonce officielle, sans clé ni serveur.
+
+async function chargerBandeAnnonceDemonSlayer() {
+    const lien = document.querySelector('.review-feature a');
+    if (!lien) return;
+
+    try {
+        const reponse = await fetch('https://api.jikan.moe/v4/anime/38000');
+        const anime = await reponse.json();
+        const idTrailer = anime.trailer && anime.trailer.youtube_id;
+
+        if (idTrailer) {
+            lien.href = `https://www.youtube.com/embed/${idTrailer}?autoplay=1`;
+        }
+        // Si l'API ne répond pas, on garde le lien déjà écrit dans le HTML
+    } catch (erreur) {
+        // Mode hors-ligne de l'API : le lien de secours du HTML reste actif
+    }
+}
+
+chargerBandeAnnonceDemonSlayer();

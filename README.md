@@ -47,7 +47,24 @@ Un bug est arrivé en cours de projet : le HTML cherchait des fichiers qui s'app
 
 La correction : renommer les fichiers pour qu'ils correspondent exactement à ce que demande le HTML (`accueil.html` → `index.html` aussi, car GitHub Pages cherche toujours un fichier nommé `index.html`).
 
-### 4. Mise en ligne avec GitHub Pages
+### 4. L'API REST de Jikan (pour trouver la bande-annonce)
+
+Pour savoir quelle vidéo mettre derrière la vignette, on a utilisé **l'API REST de Jikan** (https://jikan.moe), qui est l'API gratuite de MyAnimeList. Une API REST, c'est un site qui renvoie des données en JSON quand on lui demande une URL — ici, les infos sur les animés.
+
+Dans `script.js`, une fonction interroge l'API avec `fetch()` et récupère **automatiquement** l'identifiant YouTube du trailer :
+
+```javascript
+const reponse = await fetch('https://api.jikan.moe/v4/anime/38000');
+const anime = await reponse.json();
+const idTrailer = anime.trailer && anime.trailer.youtube_id;
+lien.href = `https://www.youtube.com/embed/${idTrailer}?autoplay=1`;
+```
+
+- `38000` c'est l'identifiant de Demon Slayer dans la base MyAnimeList
+- Pas besoin de clé d'API ni de serveur : le navigateur fait la requête directement
+- Si l'API ne répond pas, le site garde le lien de secours écrit dans le HTML, donc la vignette marche quand même
+
+### 5. Mise en ligne avec GitHub Pages
 
 Le site est hébergé gratuitement sur **GitHub Pages** : le dépôt est public, et dans *Settings → Pages* on a choisi la branche `main`. GitHub transforme automatiquement le contenu du dépôt en site web accessible ici :
 
@@ -57,6 +74,5 @@ Le site est hébergé gratuitement sur **GitHub Pages** : le dépôt est public,
 
 ## Ce qu'on pourrait faire ensuite
 
-- Récupérer les infos des animés (images, trailers) automatiquement depuis une **API REST** comme [Jikan](https://jikan.moe) (API gratuite de MyAnimeList, qui marche sans clé ni serveur)
-- Faire une grille de plusieurs animés générée en JavaScript
+- Faire une grille de plusieurs animés générée en JavaScript avec l'API (`limit=6` + une boucle)
 - Ouvrir la vidéo dans une petite fenêtre dans la page (modale) au lieu d'un nouvel onglet
