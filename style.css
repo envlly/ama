@@ -1102,3 +1102,54 @@ select,
 .review-feature a img:hover {
     transform: scale(1.05);
 }
+
+
+/* Bouton "Visualiser" sur l'affiche */
+.poster-wrap {
+    position: relative;
+}
+
+.watch-btn {
+    position: absolute;
+    left: 50%;
+    bottom: 12px;
+    transform: translateX(-50%) translateY(6px);
+
+    padding: 8px 16px;
+    border: none;
+    border-radius: 999px;
+
+    background: var(--purple, #a8436d);
+    color: white;
+
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 700;
+
+    cursor: pointer;
+    opacity: 0;
+    pointer-events: none;
+
+    transition: opacity .25s, transform .25s;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, .35);
+}
+
+.anime-card a.poster-link:hover .watch-btn,
+.anime-card a.poster-link:focus-visible .watch-btn {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateX(-50%) translateY(0);
+}
+
+.watch-btn:hover {
+    filter: brightness(1.15);
+}
+
+/* Sur mobile (pas de survol possible) : bouton toujours visible */
+@media (hover: none) {
+    .watch-btn {
+        opacity: 1;
+        pointer-events: auto;
+        transform: translateX(-50%) translateY(0);
+    }
+}

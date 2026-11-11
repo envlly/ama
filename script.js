@@ -148,6 +148,10 @@ function cardTemplate(anime) {
                         ${anime.type}
                     </span>
 
+                    <button class="watch-btn" type="button" aria-label="Visualiser la bande-annonce de ${anime.title}">
+                        ▶ Visualiser
+                    </button>
+
                 </div>
 
             </a>

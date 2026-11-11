@@ -67,6 +67,12 @@ lien.href = `https://www.youtube.com/embed/${idTrailer}?autoplay=1`;
 - Un `MutationObserver` relance la liaison chaque fois que la grille est régénérée (recherche, filtre, changement de page)
 - Si l'API ne répond pas, le site garde un lien de secours vers la recherche YouTube, donc la vignette marche quand même
 
+### 4bis. Le bouton « ▶ Visualiser » sur chaque affiche
+
+Chaque affiche de la grille affiche un bouton **▶ Visualiser** qui apparaît quand on passe la souris dessus (et reste visible en permanence sur mobile, où il n'y a pas de survol). Un clic n'importe où sur l'affiche ou sur le bouton ouvre la bande-annonce dans un nouvel onglet.
+
+C'est du CSS pur : le bouton est un `<button>` positionné en absolute au bas de l'affiche, invisible (`opacity: 0`) par défaut, puis rendu visible par la règle `:hover` du lien parent. La media query `@media (hover: none)` détecte les écrans tactiles pour l'afficher en permanence.
+
 ### 5. Mise en ligne avec GitHub Pages
 
 Le site est hébergé gratuitement sur **GitHub Pages** : le dépôt est public, et dans *Settings → Pages* on a choisi la branche `main`. GitHub transforme automatiquement le contenu du dépôt en site web accessible ici :
