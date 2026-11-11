@@ -543,43 +543,47 @@ chargerBandeAnnonceDemonSlayer();
 
 const cacheTrailers = new Map();
 
-// Cherche l'identifiant YouTube du trailer : d'abord Jikan, puis AniList
-async function trouverIdTrailer(titre) {
+// fetch avec minuteur : si l'API met trop de temps à répondre, on abandonne
+function fetchAvecDelai(url, options, delaiMs) {
+    const controleur = new AbortController();
+    const minuteur = setTimeout(() => controleur.abort(), delaiMs);
+    return fetch(url, { ...options, signal: controleur.signal }).finally(() => clearTimeout(minuteur));
+}
 
-    // Source 1 : Jikan (l'API de MyAnimeList)
-    try {
-        const reponse = await fetch(
-            `https://api.jikan.moe/v4/anime?q=${encodeURIComponent(titre)}&limit=1`
-        );
-        const donnees = await reponse.json();
-        const anime = donnees.data && donnees.data[0];
-        if (anime && anime.trailer && anime.trailer.youtube_id) {
-            return anime.trailer.youtube_id;
-        }
-    } catch (erreur) {
-        // Jikan injoignable : on passe à AniList
-    }
+// Source 1 : Jikan (l'API de MyAnimeList)
+async function jikanTrailer(titre) {
+    const reponse = await fetchAvecDelai(
+        `https://api.jikan.moe/v4/anime?q=${encodeURIComponent(titre)}&limit=1`,
+        {}, 6000
+    );
+    const donnees = await reponse.json();
+    const anime = donnees.data && donnees.data[0];
+    return (anime && anime.trailer && anime.trailer.youtube_id) || null;
+}
 
-    // Source 2 : AniList (GraphQL). On prend 5 résultats et on garde
-    // celui dont le titre contient le plus de mots du titre cherché.
-    try {
-        const titreProtege = titre.replace(/"/g, '\\"');
-        const reponse = await fetch('https://graphql.anilist.co', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                query: `{Page(perPage:5){media(search:"${titreProtege}",type:ANIME){title{romaji english} trailer{id site}}}}`
-            })
-        });
-        const donnees = await reponse.json();
-        const resultats = (donnees.data && donnees.data.Page && donnees.data.Page.media) || [];
+// Source 2 : AniList (GraphQL) — UNE SEULE requête pour tous les titres.
+// On prend 5 résultats par titre et on garde celui dont le titre
+// contient le plus de mots du titre cherché.
+async function anilistTrailers(titres) {
 
+    const alias = titres.map((t, i) => `a${i}: Media(search:"${t.replace(/"/g, '\\"')}",type:ANIME){title{romaji english} trailer{id site}}`);
+    const reponse = await fetchAvecDelai('https://graphql.anilist.co', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: `{${alias.join(' ')}}` })
+    }, 10000);
+
+    const donnees = await reponse.json();
+    const resultats = {};
+
+    titres.forEach((titre, i) => {
+        const liste = (donnees.data && donnees.data[`a${i}`]) ? [donnees.data[`a${i}`]] : [];
         const mots = titre.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
         let meilleurId = null;
         let meilleurScore = 0;
 
-        for (const media of resultats) {
-            if (!media.trailer || media.trailer.site !== 'youtube') continue;
+        for (const media of liste) {
+            if (!media || !media.trailer || media.trailer.site !== 'youtube') continue;
             const titreComplet = (media.title.romaji + ' ' + (media.title.english || '')).toLowerCase();
             const score = mots.filter(mot => titreComplet.includes(mot)).length;
             if (score > meilleurScore) {
@@ -588,40 +592,63 @@ async function trouverIdTrailer(titre) {
             }
         }
 
-        if (meilleurId) return meilleurId;
+        resultats[titre] = meilleurId;
+    });
 
-    } catch (erreur) {
-        // AniList injoignable aussi : on garde le lien de secours
-    }
-
-    return null;
+    return resultats;
 }
 
 async function lierTrailerJikan() {
 
-    const liens = document.querySelectorAll("a.poster-link[data-anime-title]");
+    const liens = [...document.querySelectorAll("a.poster-link[data-anime-title]")];
 
+    // 1. Appliquer tout ce qui est déjà dans le cache
+    const manquants = [];
     for (const lien of liens) {
-
         const titre = lien.dataset.animeTitle;
-
         if (cacheTrailers.has(titre)) {
             if (cacheTrailers.get(titre)) {
                 lien.href = `https://www.youtube.com/embed/${cacheTrailers.get(titre)}?autoplay=1`;
             }
-            continue;
+        } else if (!manquants.includes(titre)) {
+            manquants.push(titre);
         }
+    }
 
-        const idTrailer = await trouverIdTrailer(titre);
+    if (manquants.length === 0) return;
 
-        if (idTrailer) {
-            cacheTrailers.set(titre, idTrailer);
-            lien.href = `https://www.youtube.com/embed/${idTrailer}?autoplay=1`;
-        } else {
-            cacheTrailers.set(titre, null);
+    // 2. Jikan pour chaque titre inconnu (en parallèle, avec délai de sécurité)
+    await Promise.allSettled(
+        manquants.map(async (titre, index) => {
+            await new Promise(resolve => setTimeout(resolve, index * 150));
+            try {
+                const id = await jikanTrailer(titre);
+                if (id) cacheTrailers.set(titre, id);
+            } catch (erreur) {
+                // Jikan injoignable ou trop lent : AniList prendra le relais
+            }
+        })
+    );
+
+    // 3. AniList en une seule requête pour les titres toujours inconnus
+    const restants = manquants.filter(titre => !cacheTrailers.has(titre));
+    if (restants.length > 0) {
+        try {
+            const resultats = await anilistTrailers(restants);
+            for (const [titre, id] of Object.entries(resultats)) {
+                cacheTrailers.set(titre, id);
+            }
+        } catch (erreur) {
+            // AniList injoignable aussi : les liens de secours restent actifs
         }
+    }
 
-        await new Promise(resolve => setTimeout(resolve, 400));
+    // 4. Appliquer les liens trouvés
+    for (const lien of liens) {
+        const titre = lien.dataset.animeTitle;
+        if (cacheTrailers.has(titre) && cacheTrailers.get(titre)) {
+            lien.href = `https://www.youtube.com/embed/${cacheTrailers.get(titre)}?autoplay=1`;
+        }
     }
 }
 
