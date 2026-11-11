@@ -49,7 +49,10 @@ La correction : renommer les fichiers pour qu'ils correspondent exactement à ce
 
 ### 4. L'API REST de Jikan (pour trouver les bandes-annonces)
 
-Pour rendre **toutes** les affiches cliquables, chaque carte de la grille (accueil, films, séries) est maintenant un lien vers la bande-annonce de l'animé. Le lien est écrit en JavaScript dans `cardTemplate()` (fonction qui fabrique les cartes) et l'API **Jikan** (https://jikan.moe), l'API gratuite de MyAnimeList, remplace automatiquement le lien de secours par la vraie bande-annonce.
+Pour rendre **toutes** les affiches cliquables, chaque carte de la grille (accueil, films, séries) est maintenant un lien vers la bande-annonce de l'animé. Le lien est écrit en JavaScript dans `cardTemplate()` (fonction qui fabrique les cartes) et deux APIs publiques le remplacent automatiquement par la vraie bande-annonce :
+
+- **Jikan** (https://jikan.moe), l'API gratuite de MyAnimeList — source principale
+- **AniList** (https://anilist.co), en secours si Jikan ne répond pas — on prend 5 résultats et on garde celui dont le titre correspond le mieux
 
 Une API REST, c'est un site qui renvoie des données en JSON quand on lui demande une URL — ici, les infos sur les animés.
 
@@ -65,7 +68,7 @@ lien.href = `https://www.youtube.com/embed/${idTrailer}?autoplay=1`;
 - Pas besoin de clé d'API ni de serveur : le navigateur fait la requête directement
 - Un cache (`Map`) évite de redemander deux fois le même animé, et une petite pause entre les requêtes respecte le quota de l'API
 - Un `MutationObserver` relance la liaison chaque fois que la grille est régénérée (recherche, filtre, changement de page)
-- Si l'API ne répond pas, le site garde un lien de secours vers la recherche YouTube, donc la vignette marche quand même
+- Si les deux APIs ne répondent pas, le site garde un lien de secours vers la recherche YouTube, donc la vignette marche quand même
 
 ### 4bis. Le bouton « ▶ Visualiser » sur chaque affiche
 

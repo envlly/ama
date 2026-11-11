@@ -536,12 +536,66 @@ async function chargerBandeAnnonceDemonSlayer() {
 chargerBandeAnnonceDemonSlayer();
 
 
-// TOUTES LES VIGNETTES CLIQUABLES GRÂCE À L'API JIKAN
+// TOUTES LES VIGNETTES CLIQUABLES GRÂCE AUX APIS JIKAN + ANILIST
 // Le lien de secours (recherche YouTube) est remplacé par la vraie
-// bande-annonce dès que l'API Jikan répond. On met un cache pour
-// ne jamais demander deux fois le même animé.
+// bande-annonce dès qu'une API répond. Un cache évite de redemander
+// deux fois le même animé.
 
 const cacheTrailers = new Map();
+
+// Cherche l'identifiant YouTube du trailer : d'abord Jikan, puis AniList
+async function trouverIdTrailer(titre) {
+
+    // Source 1 : Jikan (l'API de MyAnimeList)
+    try {
+        const reponse = await fetch(
+            `https://api.jikan.moe/v4/anime?q=${encodeURIComponent(titre)}&limit=1`
+        );
+        const donnees = await reponse.json();
+        const anime = donnees.data && donnees.data[0];
+        if (anime && anime.trailer && anime.trailer.youtube_id) {
+            return anime.trailer.youtube_id;
+        }
+    } catch (erreur) {
+        // Jikan injoignable : on passe à AniList
+    }
+
+    // Source 2 : AniList (GraphQL). On prend 5 résultats et on garde
+    // celui dont le titre contient le plus de mots du titre cherché.
+    try {
+        const titreProtege = titre.replace(/"/g, '\\"');
+        const reponse = await fetch('https://graphql.anilist.co', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                query: `{Page(perPage:5){media(search:"${titreProtege}",type:ANIME){title{romaji english} trailer{id site}}}}`
+            })
+        });
+        const donnees = await reponse.json();
+        const resultats = (donnees.data && donnees.data.Page && donnees.data.Page.media) || [];
+
+        const mots = titre.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+        let meilleurId = null;
+        let meilleurScore = 0;
+
+        for (const media of resultats) {
+            if (!media.trailer || media.trailer.site !== 'youtube') continue;
+            const titreComplet = (media.title.romaji + ' ' + (media.title.english || '')).toLowerCase();
+            const score = mots.filter(mot => titreComplet.includes(mot)).length;
+            if (score > meilleurScore) {
+                meilleurScore = score;
+                meilleurId = media.trailer.id;
+            }
+        }
+
+        if (meilleurId) return meilleurId;
+
+    } catch (erreur) {
+        // AniList injoignable aussi : on garde le lien de secours
+    }
+
+    return null;
+}
 
 async function lierTrailerJikan() {
 
@@ -558,24 +612,13 @@ async function lierTrailerJikan() {
             continue;
         }
 
-        try {
+        const idTrailer = await trouverIdTrailer(titre);
 
-            const reponse = await fetch(
-                `https://api.jikan.moe/v4/anime?q=${encodeURIComponent(titre)}&limit=1`
-            );
-            const donnees = await reponse.json();
-            const anime = donnees.data && donnees.data[0];
-            const idTrailer = anime && anime.trailer && anime.trailer.youtube_id;
-
-            if (idTrailer) {
-                cacheTrailers.set(titre, idTrailer);
-                lien.href = `https://www.youtube.com/embed/${idTrailer}?autoplay=1`;
-            } else {
-                cacheTrailers.set(titre, null);
-            }
-
-        } catch (erreur) {
-            // API indisponible : le lien de secours (recherche YouTube) reste actif
+        if (idTrailer) {
+            cacheTrailers.set(titre, idTrailer);
+            lien.href = `https://www.youtube.com/embed/${idTrailer}?autoplay=1`;
+        } else {
+            cacheTrailers.set(titre, null);
         }
 
         await new Promise(resolve => setTimeout(resolve, 400));
